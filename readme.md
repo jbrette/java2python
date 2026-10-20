@@ -8,8 +8,9 @@ file.  The generated Python code is not guaranteed to run, nor is guaranteed to
 be syntactically valid Python.  However, java2python works well many cases, and
 in some of those, it creates perfectly usable and workable Python code.
 
-For more information, read the [introduction][].  To install, refer to the
-[installation][] page.
+The generated code targets Python 3.14+, and java2python itself requires
+Python 3.14+.  For more information, read the [introduction][].  To install
+(with [uv][]), refer to the [installation][] page.
 
 There are [lots of docs][], [plenty of tests][], and [many options][] for
 controlling code generation.
@@ -34,20 +35,19 @@ Next we run our program:
 
 
 ```bash
-$ j2py HelloWorld.java
+$ uv run j2py HelloWorld.java
 ```
 ```python
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """ generated source for module HelloWorld """
-
 #  This is the HelloWorld class with a single method.
-class HelloWorld(object):
+class HelloWorld:
     """ generated source for class HelloWorld """
-
     @classmethod
     def main(cls, args):
         """ generated source for method main """
-        print "Hello, world."
+        print("Hello, world.")
+
 
 if __name__ == '__main__':
     import sys
@@ -56,6 +56,7 @@ if __name__ == '__main__':
 
 
 [downloads]: https://github.com/natural/java2python/downloads
+[uv]: https://docs.astral.sh/uv/
 [installation]: https://github.com/natural/java2python/tree/master/doc/install.md
 [introduction]: https://github.com/natural/java2python/tree/master/doc/intro.md
 [lots of docs]: https://github.com/natural/java2python/tree/master/doc/

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # java2python.compiler package marker.
 #
 # This module provides a simpler facade over the rest of the compiler

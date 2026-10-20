@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 modulePrologueHandlers = [
     'from java2python.mod.include.classmethod import classmethod_ as classmethod',
     'from java2python.mod.include.overloading import overloaded',

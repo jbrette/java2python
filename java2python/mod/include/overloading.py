@@ -39,12 +39,6 @@ Python 2.5 is required due to the use of predicates any() and all().
 from types import MethodType as instancemethod
 
 import sys
-if sys.version_info[0] < 3:
-    # Make the environment more like Python 3.0
-    __metaclass__ = type
-    
-
-
 class overloaded:
     """An implementation of overloaded functions."""
 
@@ -114,7 +108,7 @@ class overloaded:
         # More than one match -- weed out the subordinate ones.
 
         def dominates(dom, sub,
-                      orders=tuple(dict((t, i) for i, t in enumerate(mro))
+                      orders=tuple({t: i for i, t in enumerate(mro)}
                                    for mro in mros)):
             # Predicate to decide whether dom strictly dominates sub.
             # Strict domination is defined as domination without equality.
@@ -139,7 +133,7 @@ class overloaded:
             return self.registry[candidates[0]]
 
         # Perhaps these multiple candidates all have the same implementation?
-        funcs = set(self.registry[cand] for cand in candidates)
+        funcs = {self.registry[cand] for cand in candidates}
         if len(funcs) == 1:
             return funcs.pop()
 

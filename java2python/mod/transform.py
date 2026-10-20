@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # java2python.mod.transform -> input AST transformer functions and constants.
 #
 # This module provides several transformation functions which are
@@ -12,7 +11,7 @@
 # understand how and when selectors are associated with these callables.
 
 import re
-from logging import warn
+from logging import warning
 
 import keyword
 import types
@@ -24,7 +23,8 @@ def invalidPythonNames():
     """ Creates a list of valid Java identifiers that are invalid in Python. """
     ts = [getattr(types, n) for n in dir(types) if not n.startswith('_')]
     ns = [t.__name__ for t in ts if isinstance(t, type)]
-    return ['None', 'True', 'False', ] + ns + keyword.kwlist
+    # print is a builtin that generated code calls, so it can't be shadowed.
+    return ['None', 'True', 'False', 'print', ] + ns + keyword.kwlist
 
 
 def keywordSafeIdent(node, config, invalid=invalidPythonNames()):
@@ -50,6 +50,22 @@ true2True = makeConst('True')
 
 def syntaxSafeDecimalLiteral(node, config):
     """ Ensures a Java decimal literal is a valid Python decimal literal. """
+    value = node.token.text
+    if value.endswith(('l', 'L')):
+        value = value[:-1]
+    node.token.text = value
+
+
+def syntaxSafeOctalLiteral(node, config):
+    """ Ensures a Java octal literal is a valid Python octal literal. """
+    value = node.token.text
+    if value.endswith(('l', 'L')):
+        value = value[:-1]
+    node.token.text = '0o' + value[1:]
+
+
+def syntaxSafeHexLiteral(node, config):
+    """ Ensures a Java hex literal is a valid Python hex literal. """
     value = node.token.text
     if value.endswith(('l', 'L')):
         value = value[:-1]
@@ -91,7 +107,7 @@ def lengthToLen(node, config):
     method = dot.parent
 
     ident = dot.firstChildOfType(tokens.IDENT)
-    ident.token.text = 'len({})'.format(ident.text)
+    ident.token.text = f'len({ident.text})'
 
     expr = method.parent
     expr.children.remove(method)
@@ -149,7 +165,7 @@ def formatString(node, config):
     dot = node.parent
     method = dot.parent
     arg_list = method.firstChildOfType(tokens.ARGUMENT_LIST)
-    call_args = [arg for arg in arg_list.childrenOfType(tokens.EXPR)]
+    call_args = [*arg_list.childrenOfType(tokens.EXPR)]
     args = [arg.firstChildOfType(tokens.IDENT) for arg in call_args[1:]]
 
     # Translate format syntax (if format == string_literal)
@@ -165,11 +181,11 @@ def formatString(node, config):
         format = call_args[0].firstChild()
         if format.type == tokens.IDENT:
             # String variable
-            warn('Formatting string %s is not automatically translated.'
+            warning('Formatting string %s is not automatically translated.'
                 % str(format.token.text))
         else:
             # Function that returns String
-            warn('Formatting string returned by %s() is not automatically translated.'
+            warning('Formatting string returned by %s() is not automatically translated.'
                 % str(format.firstChildOfType(tokens.IDENT).token.text))
 
     left_ident = dot.children[0]

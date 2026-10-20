@@ -13,10 +13,14 @@ a failure.
 
 ### How to Run the Test Suite
 
+The suite runs the translated code through [uv][], so create the project
+environment first.  You also need a JDK (`javac` and `java`) on your path.
 The simplest way to run the suite is to run all of it:
 
 ```bash
-$ cd some_path_to/java2python/test
+$ cd some_path_to/java2python
+$ uv sync
+$ cd test
 $ make
 ```
 
@@ -83,3 +87,4 @@ indicate the new feature is working correctly.
 [makefile]: https://github.com/natural/java2python/blob/master/test/Makefile
 [runjava]: https://github.com/natural/java2python/blob/master/test/runjava
 [runj2py]: https://github.com/natural/java2python/blob/master/test/runj2py
+[uv]: https://docs.astral.sh/uv/

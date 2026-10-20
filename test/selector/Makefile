@@ -7,6 +7,6 @@ all:
 	$(MAKE) $(test_targets)
 
 %:
-	@python -m unittest -v $@
+	@uv run --project ../.. python -m unittest -v $@
 
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # java2python.compiler.visitor -> Base classes for walking ASTs.
 #
 # This module defines classes that accept nodes during AST walking.  These
@@ -14,30 +13,30 @@
 
 from functools import reduce, partial
 from itertools import filterfalse, tee
-from logging import debug, warn
+from logging import debug, warning
 from re import compile as recompile, sub as resub
 
 from java2python.lang import tokens
 from java2python.lib import FS
 
 
-class Memo(object):
+class Memo:
     """ Memo -> AST walking luggage. """
 
     def __init__(self):
         self.comments, self.last = set(), 0
 
 
-class Base(object):
+class Base:
     """ Base ->  Parent class for AST visitors. """
 
-    commentSubs = list(map(recompile, ['^\s*/(\*)+', '(\*)+/\s*$', '^\s*//']))
+    commentSubs = list(map(recompile, [r'^\s*/(\*)+', r'(\*)+/\s*$', r'^\s*//']))
 
     def accept(self, node, memo):
         """ Accept a node, possibly creating a child visitor. """
         tokType = tokens.map.get(node.token.type)
         missing = lambda node, memo:self
-        call = getattr(self, 'accept{0}'.format(tokens.title(tokType)), missing)
+        call = getattr(self, f'accept{tokens.title(tokType)}', missing)
         if call is missing:
             debug('no visitor accept method for %s', tokType)
         return call(node, memo)
@@ -111,7 +110,7 @@ class Base(object):
         return alt(stype)
 
 
-class TypeAcceptor(object):
+class TypeAcceptor:
     """ TypeAcceptor -> shared visitor method(s) for type declarations. """
 
     def makeAcceptType(ft):
@@ -155,7 +154,7 @@ class Module(TypeAcceptor, Base):
     acceptPackage = makeAcceptHandledDecl('PackageDeclaration')
 
 
-class ModifiersAcceptor(object):
+class ModifiersAcceptor:
     """ ModifiersAcceptor -> shared behavior of classes and methods. """
 
     def acceptModifierList(self, node, memo):
@@ -200,7 +199,7 @@ class ModifiersAcceptor(object):
         self.modifiers.append(branch.text)
 
 
-class VarAcceptor(object):
+class VarAcceptor:
     """ Mixin for blocks that accept handle var declarations. """
 
     def acceptVarDeclaration(self, node, memo):
@@ -234,7 +233,7 @@ class VarAcceptor(object):
                     val = assgnExp.pushRight('[]')
                 else:
                     if node.firstChildOfType(tokens.TYPE).firstChild().type != tokens.QUALIFIED_TYPE_IDENT:
-                        val = assgnExp.pushRight('{0}()'.format(identExp.type))
+                        val = assgnExp.pushRight(f'{identExp.type}()')
                     else:
                         val = assgnExp.pushRight('None')
         return self
@@ -267,8 +266,7 @@ class Class(VarAcceptor, TypeAcceptor, ModifiersAcceptor, Base):
             # superclass constructor, the Java compiler automatically
             # inserts a call to the no-argument constructor of the
             # superclass.
-            fs = 'super(' + FS.r + ', self).__init__()'
-            self.factory.expr(fs=fs, right=self.name, parent=method)
+            self.factory.expr(fs='super().__init__()', parent=method)
         return method
 
     def acceptFunctionMethodDecl(self, node, memo):
@@ -310,8 +308,8 @@ class Annotation(Class):
                 self.walk(child, memo)
         self.addCall(args, memo)
         self.addInit(args, memo)
-        self.children.sort(lambda a, b:-1 if a.name == '__call__' else 0)
-        self.children.sort(lambda a, b:-1 if a.name == '__init__' else 0)
+        self.children.sort(key=lambda c:c.name != '__call__')
+        self.children.sort(key=lambda c:c.name != '__init__')
 
     def addInit(self, args, memo):
         """ Make an __init__ function in this annotation class. """
@@ -343,7 +341,7 @@ class Enum(Class):
         idents = node.childrenOfType(tokens.IDENT)
         factory = self.factory.expr
         handler = self.configHandler('Value')
-        setFs = lambda v:'{0}.{1} = {2}'.format(self.name, v, self.name)
+        setFs = lambda v:f'{self.name}.{v} = {self.name}'
         for index, ident in enumerate(idents):
             args = list(ident.findChildrenOfType(tokens.ARGUMENT_LIST))
             if args:
@@ -387,7 +385,7 @@ class MethodContent(VarAcceptor, Base):
                 break
         if insert:
             if len(node.children):
-                warn('Detected unhandled break statement with label; generated code incorrect.')
+                warning('Detected unhandled break statement with label; generated code incorrect.')
             breakStat = self.factory.statement('break', parent=self)
 
     def acceptCatch(self, node, memo):
@@ -413,7 +411,7 @@ class MethodContent(VarAcceptor, Base):
             updateStat.walk(parent.firstChildOfType(tokens.FOR_UPDATE), memo)
         contStat = self.factory.statement('continue', fs=FS.lsr, parent=self)
         if len(node.children):
-            warn('Detected unhandled continue statement with label; generated code incorrect.')
+            warning('Detected unhandled continue statement with label; generated code incorrect.')
 
     def acceptDo(self, node, memo):
         """ Accept and process a do-while block. """
@@ -638,7 +636,7 @@ class Method(ModifiersAcceptor, MethodContent):
     def acceptFormalParamVarargDecl(self, node, memo):
         """ Accept and process a var arg declaration. """
         ident = node.firstChildOfType(tokens.IDENT)
-        param = {'name':'*{0}'.format(ident.text), 'type':'A'}
+        param = {'name':f'*{ident.text}', 'type':'A'}
         self.parameters.append(param)
         return self
 
@@ -670,7 +668,6 @@ class Expression(Base):
     acceptAnd = nodeOpExpr
     acceptAndAssign = nodeOpExpr
     acceptAssign = nodeOpExpr
-    acceptDivAssign = nodeOpExpr
     acceptEqual = nodeOpExpr
     acceptGreaterOrEqual = nodeOpExpr
     acceptGreaterThan = nodeOpExpr
@@ -701,7 +698,6 @@ class Expression(Base):
         return acceptPreformatted
 
     acceptArrayElementAccess = makeNodePreformattedExpr(FS.l + '[' + FS.r + ']')
-    acceptDiv = makeNodePreformattedExpr(FS.l + ' / ' + FS.r)
     acceptLogicalAnd = makeNodePreformattedExpr(FS.l + ' and ' + FS.r)
     acceptLogicalNot = makeNodePreformattedExpr('not ' + FS.l)
     acceptLogicalOr = makeNodePreformattedExpr(FS.l + ' or ' + FS.r)
@@ -731,7 +727,7 @@ class Expression(Base):
             if handler:
                 handler(self, node)
             else:
-                warn('No handler to perform cast of non-primitive type %s.', typeName)
+                warning('No handler to perform cast of non-primitive type %s.', typeName)
         self.left, self.right = visitors = factory(parent=self), factory(parent=self)
         self.zipWalk(node.children, visitors, memo)
 
@@ -761,6 +757,20 @@ class Expression(Base):
     acceptPreInc = makeAcceptPrePost(' += 1', pre=True)
     acceptPostDec = makeAcceptPrePost(' -= 1', pre=False)
     acceptPreDec = makeAcceptPrePost(' -= 1', pre=True)
+
+    def makeAcceptJavaDiv(fs):
+        """ Make an accept method for division with Java integer semantics. """
+        def acceptJavaDiv(self, node, memo):
+            factory = self.factory.expr
+            self.fs = fs
+            self.left, self.right = visitors = factory(parent=self), factory(parent=self)
+            self.zipWalk(node.children, visitors, memo)
+            module = next(self.parents(lambda x:x.isModule))
+            module.needsJavaDivFunc = True
+        return acceptJavaDiv
+
+    acceptDiv = makeAcceptJavaDiv('jdiv(' + FS.l + ', ' + FS.r + ')')
+    acceptDivAssign = makeAcceptJavaDiv(FS.l + ' = jdiv(' + FS.l + ', ' + FS.r + ')')
 
     def acceptBitShiftRight(self, node, memo):
         """ Accept and process a bit shift right expression. """
@@ -853,14 +863,12 @@ class Expression(Base):
 
     def acceptSuper(self, node, memo):
         """ Accept and process a super expression. """
-        cls = next(self.parents(lambda c:c.isClass))
-        self.right = self.factory.expr(fs='super({name}, self)'.format(name=cls.name))
+        self.right = self.factory.expr(fs='super()')
 
     def acceptSuperConstructorCall(self, node, memo):
         """ Accept and process a super constructor call. """
-        cls = next(self.parents(lambda c:c.isClass))
-        fs = 'super(' + FS.l + ', self).__init__(' + FS.r + ')'
-        self.right = self.factory.expr(fs=fs, left=cls.name)
+        fs = 'super().__init__(' + FS.r + ')'
+        self.right = self.factory.expr(fs=fs)
         return self.right
 
     def acceptThis(self, node, memo):

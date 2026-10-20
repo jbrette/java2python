@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # java2python.mod.basic -> functions to revise generated source strings.
 
 from itertools import count
-from logging import info, warn
+from logging import info, warning
 from os import path
 from re import sub as rxsub
 
@@ -12,7 +11,7 @@ from java2python.lib import FS
 
 def shebangLine(module):
     """ yields the canonical python shebang line. """
-    yield '#!/usr/bin/env python'
+    yield '#!/usr/bin/env python3'
 
 
 def encodingLine(encoding='utf-8'):
@@ -23,7 +22,7 @@ def encodingLine(encoding='utf-8'):
     syntax error when the compile function is used.
     """
     def line(module):
-        yield '# -*- coding: {0} -*-'.format(encoding)
+        yield f'# -*- coding: {encoding} -*-'
     return line
 
 
@@ -32,7 +31,7 @@ def simpleDocString(obj):
 
     This generator works for modules, classes, and functions.
     """
-    yield '""" generated source for {0} {1} """'.format(obj.typeName, obj.name)
+    yield f'""" generated source for {obj.typeName} {obj.name} """'
 
 
 def commentedImports(module, expr):
@@ -50,11 +49,11 @@ def commentedPackages(module, expr):
 def namespacePackages(module, expr):
     source = module.sourceFilename
     if not source:
-        warn('namespace package not created; source input not named.')
+        warning('namespace package not created; source input not named.')
         return
     initname = path.join(path.dirname(source), '__init__.py')
     if path.exists(initname):
-        warn('namespace package not created; __init__.py exists.')
+        warning('namespace package not created; __init__.py exists.')
         return
     with open(initname, 'w') as initfile:
         initfile.write('from pkgutil import extend_path\n')
@@ -93,7 +92,7 @@ def scriptMainStanza(module):
 
 
 def outputSubs(obj, text):
-    subsname = '{0}OutputSubs'.format(obj.typeName)
+    subsname = f'{obj.typeName}OutputSubs'
     subs = obj.config.every(subsname, [])
     for sub in subs:
         for pattern, repl in sub:
@@ -115,8 +114,8 @@ def overloadedClassMethods(method):
     for i, m in enumerate(methods[1:]):
         args = [p['type'] for p in m.parameters]
         args = ', '.join(args)
-        m.overloaded = '@{0}.register({1})'.format(method.name, args)
-        m.name = '{0}_{1}'.format(method.name, i)
+        m.overloaded = f'@{method.name}.register({args})'
+        m.name = f'{method.name}_{i}'
     # for this one only:
     yield '@overloaded'
 
@@ -137,13 +136,19 @@ def maybeSynchronizedMethod(method):
 
 
 def globalNameCounter(original, counter=count()):
-    return '__{0}_{1}'.format(original, next(counter))
+    return f'__{original}_{next(counter)}'
 
 
 def getBsrSrc():
     from inspect import getsource
     from java2python.mod.include.bsr import bsr
     return getsource(bsr)
+
+
+def getJavaDivSrc():
+    from inspect import getsource
+    from java2python.mod.include.jdiv import jdiv
+    return getsource(jdiv)
 
 
 def getSyncHelpersSrc():
@@ -154,19 +159,22 @@ def getSyncHelpersSrc():
 
 def maybeBsr(module):
     if getattr(module, 'needsBsrFunc', False):
-        for line in getBsrSrc().split('\n'):
-            yield line
+        yield from getBsrSrc().split('\n')
+
+
+def maybeJavaDiv(module):
+    if getattr(module, 'needsJavaDivFunc', False):
+        yield from getJavaDivSrc().split('\n')
 
 
 def maybeAbstractHelpers(module):
     if getattr(module, 'needsAbstractHelpers', False):
-        yield 'from abc import ABCMeta, abstractmethod'
+        yield 'from abc import ABC, abstractmethod'
 
 
 def maybeSyncHelpers(module):
     if getattr(module, 'needsSyncHelpers', False):
-        for line in getSyncHelpersSrc().split('\n'):
-            yield line
+        yield from getSyncHelpersSrc().split('\n')
 
 
 def classContentSort(obj):
@@ -206,11 +214,16 @@ def zopeInterfaceMethodParams(obj):
                 yield param
 
 
-normalBases = ('object', )
+normalBases = ()
 
 
 def defaultBases(obj):
-    return iter(obj.bases or normalBases)
+    # Python 3 classes derive from object implicitly; `extends Object` adds nothing.
+    return (base for base in obj.bases if base != 'object')
+
+
+def abcInterfaceBases(obj):
+    return iter(obj.bases or ['ABC'])
 
 
 def zopeInterfaceBases(obj):
@@ -231,11 +244,11 @@ def zopeImplementsClassBases(obj):
 def zopeImplementsClassHead(obj):
     if implAny(obj):
         for cls in obj.bases:
-            yield 'zope.interface.implements({})'.format(cls)
+            yield f'zope.interface.implements({cls})'
 
 
 def moveStaticExpressions(cls):
-    name = '{}.'.format(cls.name) # notice the dot
+    name = f'{cls.name}.' # notice the dot
     exprs = [child for child in cls.children if child.isExpression and name in str(child)]
     module = next(cls.parents(lambda x:x.isModule))
     for expr in exprs:

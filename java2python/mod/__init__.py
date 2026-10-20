@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # java2python.mod -> provides simple modification routines for the
 # library and projects using it.
 #

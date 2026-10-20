@@ -1,10 +1,9 @@
 # $ANTLR 3.1.3 Mar 18, 2009 10:09:25 Java.g 2012-01-29 13:54:04
 
 import sys
-from antlr3 import *
-from antlr3.compat import set, frozenset
+from java2python.lang.antlr3 import *
 
-from antlr3.tree import *
+from java2python.lang.antlr3.tree import *
 
 
 
@@ -233,6 +232,7 @@ tokenNames = [
     "ESCAPE_SEQUENCE", "UNICODE_ESCAPE", "OCTAL_ESCAPE", "JAVA_ID_START", 
     "JAVA_ID_PART", "WS", "COMMENT", "LINE_COMMENT", "JAVADOC_COMMENT"
 ]
+
 
 
 
@@ -23322,16 +23322,3 @@ class JavaParser(Parser):
     FOLLOW_expression_in_synpred237_Java14355 = frozenset([41])
     FOLLOW_RBRACK_in_synpred237_Java14357 = frozenset([1])
 
-
-
-def main(argv, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr):
-    from antlr3.main import ParserMain
-    main = ParserMain("JavaLexer", JavaParser)
-    main.stdin = stdin
-    main.stdout = stdout
-    main.stderr = stderr
-    main.execute(argv)
-
-
-if __name__ == '__main__':
-    main(sys.argv)

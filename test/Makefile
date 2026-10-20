@@ -1,7 +1,7 @@
 javac := javac
 java := java
-python := python -B
-j2py = ../bin/j2py
+python := uv run --project .. python -B
+j2py = uv run --project .. j2py
 
 
 python_files := $(addsuffix .py, $(notdir $(basename $(wildcard *.java))))
@@ -28,7 +28,7 @@ clean:
 
 packages:
 	@cd Package0 && javac Class0.java
-	@cd Package0 && ../$(j2py) Class0.java Class0.py
+	@cd Package0 && $(j2py) Class0.java Class0.py
 
 
 parsers:

@@ -1,8 +1,7 @@
 # $ANTLR 3.1.3 Mar 18, 2009 10:09:25 Java.g 2012-01-29 13:54:05
 
 import sys
-from antlr3 import *
-from antlr3.compat import set, frozenset
+from java2python.lang.antlr3 import *
 
 
 # for convenience in actions
@@ -190,6 +189,7 @@ FOR_EACH=130
 ARRAY_INITIALIZER=116
 CATCH_CLAUSE_LIST=119
 SUPER_CONSTRUCTOR_CALL=153
+
 
 
 class JavaLexer(Lexer):
@@ -5270,16 +5270,3 @@ class JavaLexer(Lexer):
             raise nvae
  
 
-
-
-def main(argv, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr):
-    from antlr3.main import LexerMain
-    main = LexerMain(JavaLexer)
-    main.stdin = stdin
-    main.stdout = stdout
-    main.stderr = stderr
-    main.execute(argv)
-
-
-if __name__ == '__main__':
-    main(sys.argv)

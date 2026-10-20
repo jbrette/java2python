@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # java2python.compiler.template -> Base classes for writing Python source.
 #
 # This module defines templates -- chunks of Python source code --
@@ -22,7 +21,7 @@ from java2python.lib import FS, colors
 from functools import reduce
 
 
-class Factory(object):
+class Factory:
     """ Factory -> creates pre-configured callables for new block instances.
 
     Both templates and visitors use an instance of this class as a simple
@@ -50,7 +49,7 @@ class Factory(object):
         try:
             return partial(self.types[name], self.config)
         except (KeyError, ):
-            raise AttributeError('Factory missing "{0}" type.'.format(name))
+            raise AttributeError(f'Factory missing "{name}" type.')
 
 
 class FactoryTypeDetector(type):
@@ -75,7 +74,7 @@ class FactoryTypeDetector(type):
             pass
 
 
-class Base(object, metaclass=FactoryTypeDetector):
+class Base(metaclass=FactoryTypeDetector):
     """ Base -> base class for formatting Python output.
 
     This class defines a large set of attributes and methods for the
@@ -167,18 +166,18 @@ class Base(object, metaclass=FactoryTypeDetector):
 
     def configHandler(self, part, suffix='Handler', default=None):
         """ Returns the config handler for this type of template. """
-        name = '{0}{1}{2}'.format(self.typeName, part, suffix)
+        name = f'{self.typeName}{part}{suffix}'
         return self.config.last(name, default)
 
     def configHandlers(self, part, suffix='Handlers'):
         """ Returns config handlers for this type of template """
-        name = '{0}{1}{2}'.format(self.typeName, part, suffix)
+        name = f'{self.typeName}{part}{suffix}'
         return map(self.toIter, chain(*self.config.every(name, [])))
 
     def dump(self, fd, level=0):
         """ Writes the Python source code for this template to the given file. """
         indent, isNotNone = level * self.indent, lambda x:x is not None
-        lineFormat = '{0}{1}\n'.format
+        lineFormat = '{}{}\n'.format
         for line in filter(isNotNone, self.iterPrologue()):
             line = lineFormat(indent, line)
             fd.write(line if line.strip() else '\n')
@@ -199,7 +198,7 @@ class Base(object, metaclass=FactoryTypeDetector):
     def dumpRepr(self, fd, level=0):
         """ Writes a debug string for this template to the given file. """
         indent, default = self.indent, lambda x, y:None
-        fd.write('{0}{1!r}\n'.format(indent*level, self))
+        fd.write(f'{indent*level}{self!r}\n')
         for child in filter(None, self.children):
             getattr(child, 'dumpRepr', default)(fd, level+1)
 
@@ -260,8 +259,7 @@ class Base(object, metaclass=FactoryTypeDetector):
             if pred(child):
                 yield child
             if hasattr(child, 'find'):
-                for value in child.find(pred):
-                    yield value
+                yield from child.find(pred)
 
     @property
     def className(self):
@@ -298,7 +296,7 @@ class Expression(Base):
     isExpression = True
 
     def __init__(self, config, left='', right='', fs=FS.lr, parent=None, tail=''):
-        super(Expression, self).__init__(config, parent=parent)
+        super().__init__(config, parent=parent)
         self.left, self.right, self.fs, self.tail = left, right, fs, tail
 
     def __repr__(self):
@@ -326,12 +324,12 @@ class Expression(Base):
 
     def dump(self, fd, level=0):
         """ Writes the Python source code for this template to the given file. """
-        line = '{0}{1}\n'.format(self.indent*level, self)
+        line = f'{self.indent*level}{self}\n'
         fd.write(line if line.strip() else '\n')
 
     def dumpRepr(self, fd, level=0):
         """ Writes a debug string for this template to the given file. """
-        fd.write('{0}{1!r}\n'.format(self.indent*level, self))
+        fd.write(f'{self.indent*level}{self!r}\n')
         for obj in (self.left, self.right):
             dumper = getattr(obj, 'dumpRepr', lambda x, y:None)
             dumper(fd, level+1)
@@ -364,7 +362,7 @@ class Statement(Base):
     isStatement = True
 
     def __init__(self, config, keyword, fs=FS.lr, parent=None):
-        super(Statement, self).__init__(config, parent=parent)
+        super().__init__(config, parent=parent)
         self.keyword = keyword
         self.expr = self.factory.expr(left=keyword, fs=fs)
         self.expr.parent = self
@@ -386,7 +384,7 @@ class Module(Base):
     def iterBody(self):
         """ Yields the items in the body of this template. """
         blank, prev = self.factory.expr(), None
-        for child in super(Module, self).iterBody():
+        for child in super().iterBody():
             if prev and not prev.isComment:
                 yield blank
                 if prev and prev.isClass and child and child.isClass:
@@ -395,12 +393,12 @@ class Module(Base):
             prev = child
 
 
-class ClassMethodSharedMixin(object):
+class ClassMethodSharedMixin:
     """ ClassMethodSharedMixin -> shared methods for Class and Method types. """
 
     def iterPrologue(self):
         """ Yields the items in the prologue of this template. """
-        prologue = super(ClassMethodSharedMixin, self).iterPrologue()
+        prologue = super().iterPrologue()
         return chain(prologue, self.decorators, self.iterDecl())
 
 
@@ -415,8 +413,8 @@ class Class(ClassMethodSharedMixin, Base):
     def iterDecl(self):
         """ Yields the declaration for this type. """
         bases = ', '.join(self.iterBases())
-        bases = '({0})'.format(bases) if bases else ''
-        yield 'class {0}{1}:'.format(self.name, bases)
+        bases = f'({bases})' if bases else ''
+        yield f'class {self.name}{bases}:'
 
     def iterBody(self):
         """ Yields the items in the body of this template. """
@@ -435,7 +433,7 @@ class Class(ClassMethodSharedMixin, Base):
         for handler in self.configHandlers('PostWalk'):
             handler(self)
         head = any(self.iterHead())
-        body = list(super(Class, self).iterBody())
+        body = list(super().iterBody())
         tail = () if (body or head) else [self.factory.expr(left='pass')]
         body = () if tail else sprinkleBlanks(body)
         return chain(body, tail)
@@ -446,7 +444,7 @@ class Annotation(Class):
     isAnnotation = True
 
     def __init__(self, config, name=None, type=None, parent=None):
-        super(Annotation, self).__init__(config, name, type, parent)
+        super().__init__(config, name, type, parent)
 
 
 class Enum(Class):
@@ -468,7 +466,7 @@ class Method(ClassMethodSharedMixin, Base):
     isMethod = True
 
     def __init__(self, config, name=None, type=None, parent=None):
-        super(Method, self).__init__(config, name, type, parent)
+        super().__init__(config, name, type, parent)
         self.parameters.append(self.makeParam('self', 'object'))
 
     def iterParams(self):
@@ -479,14 +477,14 @@ class Method(ClassMethodSharedMixin, Base):
         """ Yields the declaration for this method template. """
         def formatParam(p):
             if 'default' in p:
-                return '{0}={1}'.format(p['name'], p['default'])
+                return '{}={}'.format(p['name'], p['default'])
             return p['name']
         params = ', '.join(formatParam(param) for param in self.iterParams())
-        yield 'def {0}({1}):'.format(self.name, params)
+        yield f'def {self.name}({params}):'
 
     def iterBody(self):
         """ Yields the items in the body of this method template. """
         head = any(self.iterHead())
-        body = list(super(Method, self).iterBody())
+        body = list(super().iterBody())
         tail = () if (body or head) else [self.factory.expr(left='pass')]
         return chain(body, tail)

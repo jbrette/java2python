@@ -1,13 +1,22 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # java2python.config -> subpackage for run-time configuration.
 
+import sys
 from functools import reduce
-from imp import load_source
+from importlib.util import module_from_spec, spec_from_file_location
 from os import path
 
 
-class Config(object):
+def load_source(modname, filename):
+    """ Loads a module from a source file, like the removed imp.load_source. """
+    spec = spec_from_file_location(modname, filename)
+    mod = module_from_spec(spec)
+    sys.modules[modname] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class Config:
     """ Config -> wraps multiple configuration modules. """
 
     def __init__(self, names):

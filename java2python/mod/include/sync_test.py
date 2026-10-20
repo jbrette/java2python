@@ -12,7 +12,7 @@ def synchronized(call):
             return call(*args, **kwds)
     return inner
 
-class Main(object):
+class Main:
 
     def __init__(self):
         self.attr = object()

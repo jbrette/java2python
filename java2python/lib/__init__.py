@@ -1,11 +1,10 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # java2python.lib -> common library bits.
 
 from functools import partial
 
 
-class FS(object):
+class FS:
     """ Format string abbreviations. """
     l = '{left}'
     r = '{right}'

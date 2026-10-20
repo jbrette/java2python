@@ -4,12 +4,13 @@
 all: JavaParser.py JavaLexer.py
 
 
-JavaParser.py: Java.g
+# The generated modules import the runtime vendored in ./antlr3, so the
+# stock "from antlr3" imports are rewritten after generation.
+JavaParser.py JavaLexer.py: Java.g
 	antlr3 Java.g
-
-
-JavaLexer.py: Java.g
-	antlr3 Java.g
+	sed -i.bak -e 's/^from antlr3/from java2python.lang.antlr3/' \
+		-e '/^from java2python.lang.antlr3.compat import/d' JavaParser.py JavaLexer.py
+	rm -f JavaParser.py.bak JavaLexer.py.bak
 
 
 clean:

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # java2python.lang.base -> lexer and parser support classes.
 #
 # This module provides the following:
@@ -49,13 +48,13 @@
 
 from io import StringIO
 
-from antlr3 import ANTLRStringStream as StringStream, CommonTokenStream as TokenStream
-from antlr3.tree import CommonTreeAdaptor, CommonTree
+from java2python.lang.antlr3 import ANTLRStringStream as StringStream, CommonTokenStream as TokenStream
+from java2python.lang.antlr3.tree import CommonTreeAdaptor, CommonTree
 
 from java2python.lib import colors
 
 
-class Tokens(object):
+class Tokens:
     """ Tokens -> simplifies token id-name and name-id mapping. """
 
     def __init__(self):
@@ -140,7 +139,7 @@ class LocalTree(CommonTree):
     }
 
     def __init__(self, payload, lexer=None, parser=None):
-        super(LocalTree, self).__init__(payload)
+        super().__init__(payload)
         self.lexer, self.parser = lexer, parser
 
     def childrenOfType(self, type):
@@ -159,7 +158,7 @@ class LocalTree(CommonTree):
         """ Formats, colors, and returns the comment text from the given token. """
         ttyp = tokens.map.get(token.type)
         text = token.text.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
-        item = '{0} [{1}:{2}] {3}'.format(ttyp, token.start, token.stop, text)
+        item = f'{ttyp} [{token.start}:{token.stop}] {text}'
         yield colors.black(item)
 
     def dump(self, fd, level=0):
@@ -172,25 +171,25 @@ class LocalTree(CommonTree):
             idxes, ttyp = '', tokens.map.get(token.type, '?')
             line = token.line
             if start and stop and start == stop:
-                idxes = 'start={}'.format(start)
+                idxes = f'start={start}'
             elif start and stop:
-                idxes = 'start={}, stop={}'.format(start, stop)
+                idxes = f'start={start}, stop={stop}'
             if line:
                 idxes = 'line={}{}{}'.format(line, ', ' if idxes else '', idxes)
-            idxes = ' [{}]'.format(idxes) if idxes else ''
+            idxes = f' [{idxes}]' if idxes else ''
             idxes = colors.black(idxes)
             args = [indent, self.colorType(ttyp), '', idxes, '']
             if extras(token.text, ttyp):
                 args[2] = ' ' + self.colorText(ttyp, token.text)
             for com in self.selectComments(start, seen):
                 for line in self.colorComments(com):
-                    print('{0}{1}'.format(indent, line), file=fd)
+                    print(f'{indent}{line}', file=fd)
             print(nform.format(*args), file=fd)
             for child in root.getChildren():
                 innerDump(child, offset+1)
             for com in self.selectComments(root.tokenStopIndex, seen):
                 for line in self.colorComments(com):
-                    print('{0}{1}'.format(indent, line), file=fd)
+                    print(f'{indent}{line}', file=fd)
         innerDump(self, level)
 
     def dumps(self, level=0):
@@ -209,8 +208,7 @@ class LocalTree(CommonTree):
         for child in self.children:
             if pred(child):
                 yield child
-            for sub in child.findChildren(pred):
-                yield sub
+            yield from child.findChildren(pred)
 
     def findChildrenOfType(self, type):
         """ Depth-first search that yields nodes of the given type. """

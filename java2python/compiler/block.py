@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # java2python.compiler.block -> Visitors combined with templates.
 #
 # This module defines classes which combine AST walking with source
@@ -16,15 +15,14 @@ from sys import modules
 from java2python.compiler import template, visitor
 
 
-def addTypeToModule(xxx_todo_changeme):
+def addTypeToModule(className, factoryName):
     """ Constructs and adds a new type to this module. """
-    (className, factoryName) = xxx_todo_changeme
     bases = (getattr(template, className), getattr(visitor, className))
     newType = type(className, bases, dict(factoryName=factoryName))
     setattr(modules[__name__], className, newType)
 
 
-list(map(addTypeToModule, (
+for className, factoryName in (
         ('Annotation',    'at'),
         ('Class',         'klass'),
         ('Comment',       'comment'),
@@ -35,5 +33,5 @@ list(map(addTypeToModule, (
         ('MethodContent', 'methodContent'),
         ('Module',        'module'),
         ('Statement',     'statement'),
-        )
-    ))
+        ):
+    addTypeToModule(className, factoryName)

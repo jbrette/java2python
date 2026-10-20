@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 # This is the default configuration file for java2python.  Unless
 # explicity disabled with the '-n' or '--nodefaults' option, the j2py
@@ -24,8 +23,8 @@ commentPrefix = '# '
 modulePrologueHandlers = [
     basic.shebangLine,
     basic.simpleDocString,
-    'from __future__ import print_function',
     basic.maybeBsr,
+    basic.maybeJavaDiv,
     basic.maybeAbstractHelpers,
     basic.maybeSyncHelpers,
 ]
@@ -63,7 +62,7 @@ classBaseHandlers = [
 ]
 
 interfaceBaseHandlers = [
-    basic.defaultBases,
+    basic.abcInterfaceBases,
 ]
 
 # These generators are called after a class has been completely
@@ -83,7 +82,6 @@ enumHeadHandlers = [
 
 interfaceHeadHandlers = [
     basic.simpleDocString,
-    '__metaclass__ = ABCMeta',
 ]
 
 
@@ -151,6 +149,8 @@ astTransforms = [
     (Type('IDENT'), transform.keywordSafeIdent),
 
     (Type('DECIMAL_LITERAL'), transform.syntaxSafeDecimalLiteral),
+    (Type('OCTAL_LITERAL'), transform.syntaxSafeOctalLiteral),
+    (Type('HEX_LITERAL'), transform.syntaxSafeHexLiteral),
     (Type('FLOATING_POINT_LITERAL'), transform.syntaxSafeFloatLiteral),
 
     (Type('TYPE') > Type('BOOLEAN'), transform.typeSub),
@@ -232,8 +232,8 @@ typeSubs = {
     'Short' : 'int',
     'short' : 'int',
 
-    'Long' : 'long',
-    'long' : 'long',
+    'Long' : 'int',
+    'long' : 'int',
 
     'Float' : 'float',
     'float' : 'float',
@@ -247,5 +247,5 @@ typeSubs = {
     'Object' : 'object',
 
     'IndexOutOfBoundsException' : 'IndexError',
-    'IOException': 'IOError',
+    'IOException': 'OSError',
     }

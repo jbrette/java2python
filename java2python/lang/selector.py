@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # java2python.lang.selector -> declarative AST node selection
 #
 # This module provides classes for simple AST node selection that can be
@@ -18,7 +17,7 @@
 from java2python.lang import tokens
 
 
-class Selector(object):
+class Selector:
     """ Base class for concrete selectors; provides operator methods. """
 
     def __add__(self, other):
@@ -53,7 +52,7 @@ class Selector(object):
         """
         return Child(self, other)
 
-    def __div__(self, other):
+    def __truediv__(self, other):
         """ E / F
 
         Produces a AnySibling.
@@ -62,11 +61,9 @@ class Selector(object):
 
     def walk(self, tree):
         """ Select items from the tree and from the tree children. """
-        for item in self(tree):
-            yield item
+        yield from self(tree)
         for child in tree.children:
-            for item in self.walk(child):
-                yield item
+            yield from self.walk(child)
 
 
 class Token(Selector):
@@ -107,7 +104,7 @@ class Token(Selector):
 
     def __str__(self):
         items = list(self.attrs.items())
-        keys = ('{}={}'.format(k, v) for k, v in items if v is not None)
+        keys = (f'{k}={v}' for k, v in items if v is not None)
         return 'Token({})'.format(', '.join(keys))
 
 
@@ -128,11 +125,10 @@ class Nth(Selector):
                 return
             if not isinstance(matches, list):
                 matches = [matches]
-            for child in matches:
-                yield child
+            yield from matches
 
     def __str__(self):
-        return 'Nth({0})[{1}]'.format(self.e, self.key)
+        return f'Nth({self.e})[{self.key}]'
 
 
 class Child(Selector):
@@ -147,7 +143,7 @@ class Child(Selector):
                 yield ftree
 
     def __str__(self):
-        return 'Child({0} > {1})'.format(self.e, self.f)
+        return f'Child({self.e} > {self.f})'
 
 
 class Type(Selector):
@@ -165,8 +161,8 @@ class Type(Selector):
                 yield tree
 
     def __str__(self):
-        val = '' if self.value is None else '={0}'.format(self.value)
-        return 'Type({0}{1}:{2})'.format(tokens.map[self.key], val, self.key)
+        val = '' if self.value is None else f'={self.value}'
+        return f'Type({tokens.map[self.key]}{val}:{self.key})'
 
 
 class Star(Selector):
@@ -196,7 +192,7 @@ class Descendant(Selector):
                 ftree = ftree.parent
 
     def __str__(self):
-        return 'Descendant({0} & {1})'.format(self.e, self.f)
+        return f'Descendant({self.e} & {self.f})'
 
 
 class AdjacentSibling(Selector):
@@ -217,7 +213,7 @@ class AdjacentSibling(Selector):
                 yield ftree
 
     def __str__(self):
-        return 'AdjacentSibling({} + {})'.format(self.e, self.f)
+        return f'AdjacentSibling({self.e} + {self.f})'
 
 
 class AnySibling(Selector):
@@ -238,4 +234,4 @@ class AnySibling(Selector):
                     yield ftree
 
     def __str__(self):
-        return 'AnySibling({} / {})'.format(self.e, self.f)
+        return f'AnySibling({self.e} / {self.f})'

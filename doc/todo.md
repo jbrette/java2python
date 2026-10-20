@@ -13,13 +13,24 @@ Status of the Python 3.14 / uv modernization and what is still open.
   literals, Java integer division via an inlined `jdiv()` helper.
 - All 100 `test/*.java` programs translate, compile, and run without errors on
   Python 3.14.8.  The selector unit tests pass.
+- The full `cd test && make` suite has been run against a JDK (Temurin 25):
+  100/100 `[PASS]`, with the Python output diffing clean against the Java
+  output.  `make selectors` passes (11 tests).
 
 ### To Do
 
-1. **Run the real test suite.**  `cd test && make` diffs the Python output
-   against the Java output, and it hasn't been run since the port because no
-   JDK was installed.  Install one (`brew install openjdk`), then run the full
-   suite and fix any `[PASS]` misses.
+1. **Labeled `break` and `continue`.**  Python has no labeled loop control, so
+   `acceptBreak` and `acceptContinue` drop the label and emit a bare `break` /
+   `continue` (`java2python/compiler/visitor.py:375` and `:406`), each warning
+   `Detected unhandled break statement with label; generated code incorrect.`
+   The statement label itself (`foo:`) is dropped too, so `test/Break0.java`
+   translates to a plain `break` inside the `while`.  That test passes only
+   because its `break foo;` targets the innermost loop; a label naming an
+   *outer* loop from a nested one, or a labeled block, generates silently wrong
+   code.  Fixing it needs a real rewrite -- a sentinel flag checked by each
+   enclosing loop, a label-specific exception raised and caught around the
+   labeled statement, or hoisting the labeled loop into a function so the jump
+   becomes a `return`.  A test with a nested loop would catch regressions.
 2. **Java `%` semantics.**  Java `%` truncates toward zero, while Python `%`
    floors, so the results differ when an operand is negative.  Consider a
    `jmod()` helper alongside `jdiv()`

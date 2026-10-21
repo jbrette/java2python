@@ -177,6 +177,14 @@ def maybeSyncHelpers(module):
         yield from getSyncHelpersSrc().split('\n')
 
 
+def maybeLabelClasses(module):
+    """ Yields the exception classes that emulate Java labeled jumps. """
+    for name, keyword, label in getattr(module, 'needsLabelClasses', ()):
+        yield f'class {name}(Exception):'
+        yield f'    """ Raised to emulate the Java statement `{keyword} {label};`. """'
+        yield ''
+
+
 def classContentSort(obj):
     isMethod = lambda x:x and x.isMethod
 

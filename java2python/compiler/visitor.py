@@ -372,21 +372,89 @@ class MethodContent(VarAcceptor, Base):
         assertStat = self.factory.statement('assert', fs=FS.lsr, parent=self)
         assertStat.expr.walk(node.firstChild(), memo)
 
+    # Java statements that become a loop in the generated Python; a bare
+    # break or continue binds to the innermost of these.  A switch is
+    # absent on purpose:  it becomes an if/elif chain, not a loop.
+    loopTypes = (tokens.WHILE, tokens.DO, tokens.FOR, tokens.FOR_EACH)
+
+    def labelJump(self, node):
+        """ Returns (target, name) for a break or continue node.
+
+        `target` is the labeled statement the jump leaves or restarts and
+        `name` is the exception class the jump has to raise to get there.
+        Both are None when the jump carries no label.  `name` alone is
+        None when a bare keyword already jumps to the right place, which
+        is the case when the labeled statement is also the innermost loop
+        around the jump.
+        """
+        ident = node.firstChildOfType(tokens.IDENT)
+        if ident is None:
+            return None, None
+        def isLabel(item):
+            if item.type != tokens.LABELED_STATEMENT:
+                return False
+            name = item.firstChildOfType(tokens.IDENT)
+            return name is not None and name.text == ident.text
+        labeled = next(node.parents(isLabel), None)
+        if labeled is None:
+            return None, None
+        target = labeled.children[1]
+        inner = next((p for p in node.parents() if p.type in self.loopTypes), None)
+        if inner is target:
+            return target, None
+        keyword = tokens.map.get(node.type, '').title()
+        return target, f'_Label{keyword}_{ident.text}'
+
+    def addLabelClass(self, name, keyword, label):
+        """ Records an exception class for the module prologue to define. """
+        module = next(self.parents(lambda x:x.isModule))
+        classes = getattr(module, 'needsLabelClasses', None)
+        if classes is None:
+            classes = module.needsLabelClasses = []
+        entry = (name, keyword, label)
+        if entry not in classes:
+            classes.append(entry)
+
+    def labelRaise(self, name):
+        """ Adds a raise statement that emulates a labeled jump. """
+        raiseStat = self.factory.statement('raise', fs=FS.lsr, parent=self)
+        raiseStat.expr.right = f'{name}()'
+
+    def openLabelContinue(self, node, loop):
+        """ Returns the block that should hold the body of the given loop.
+
+        A loop targeted by a labeled continue runs its body inside a try,
+        so that the exception resumes the loop instead of leaving it.
+        """
+        if getattr(node, 'labelContinueClass', None):
+            return self.factory.statement('try', fs=FS.lc, parent=loop)
+        return loop
+
+    def closeLabelContinue(self, node, loop):
+        """ Adds the handler that catches a labeled continue, if needed. """
+        name = getattr(node, 'labelContinueClass', None)
+        if name:
+            exStat = self.factory.statement('except', fs=FS.lsrc, parent=loop)
+            exStat.expr.right = name
+            self.factory.expr(left='pass', parent=exStat)
+
     def acceptBreak(self, node, memo):
         """ Accept and process a break statement. """
-        # possible parents of a break statement:  switch, while, do, for
-        # we want to skip inserting a break statement if we're inside a switch.
-        insert, ok_types = True, [tokens.WHILE, tokens.DO, tokens.FOR]
-        for parent in node.parents():
-            if parent.type == tokens.SWITCH:
-                insert = False
-                break
-            if parent.type in ok_types:
-                break
-        if insert:
-            if len(node.children):
-                warning('Detected unhandled break statement with label; generated code incorrect.')
-            breakStat = self.factory.statement('break', parent=self)
+        target, name = self.labelJump(node)
+        if name:
+            self.labelRaise(name)
+            return
+        # An unlabeled break inside a switch ends the case rather than a
+        # loop, and the generated if/elif chain needs no statement for it.
+        # A labeled break is always emitted:  it reached this point only
+        # because a bare break lands where the label points.
+        if target is None:
+            for parent in node.parents():
+                if parent.type == tokens.SWITCH:
+                    return
+                if parent.type in self.loopTypes:
+                    break
+        self.factory.statement('break', parent=self)
 
     def acceptCatch(self, node, memo):
         """ Accept and process a catch statement. """
@@ -405,13 +473,15 @@ class MethodContent(VarAcceptor, Base):
 
     def acceptContinue(self, node, memo):
         """ Accept and process a continue statement. """
-        parent = next(node.parents(lambda x: x.type in {tokens.FOR, tokens.FOR_EACH, tokens.DO, tokens.WHILE}))
+        name = self.labelJump(node)[1]
+        if name:
+            self.labelRaise(name)
+            return
+        parent = next(node.parents(lambda x: x.type in self.loopTypes))
         if parent.type == tokens.FOR:
             updateStat = self.factory.expr(parent=self)
             updateStat.walk(parent.firstChildOfType(tokens.FOR_UPDATE), memo)
         contStat = self.factory.statement('continue', fs=FS.lsr, parent=self)
-        if len(node.children):
-            warning('Detected unhandled continue statement with label; generated code incorrect.')
 
     def acceptDo(self, node, memo):
         """ Accept and process a do-while block. """
@@ -419,7 +489,8 @@ class MethodContent(VarAcceptor, Base):
         blkNode, parNode = node.children
         whileStat = self.factory.statement('while', fs=FS.lsrc, parent=self)
         whileStat.expr.right = 'True'
-        whileStat.walk(blkNode, memo)
+        self.openLabelContinue(node, whileStat).walk(blkNode, memo)
+        self.closeLabelContinue(node, whileStat)
         fs = FS.l+ ' ' + 'not ({right}):'
         ifStat = self.factory.statement('if', fs=fs, parent=whileStat)
         ifStat.expr.walk(parNode, memo)
@@ -450,10 +521,12 @@ class MethodContent(VarAcceptor, Base):
         else:
             whileStat.expr.walk(cond, memo)
         whileBlock = self.factory.methodContent(parent=self)
+        forBody = self.openLabelContinue(node, whileBlock)
         if not node.firstChildOfType(tokens.BLOCK_SCOPE).children:
-            self.factory.expr(left='pass', parent=whileBlock)
+            self.factory.expr(left='pass', parent=forBody)
         else:
-            whileBlock.walk(node.firstChildOfType(tokens.BLOCK_SCOPE), memo)
+            forBody.walk(node.firstChildOfType(tokens.BLOCK_SCOPE), memo)
+        self.closeLabelContinue(node, whileBlock)
         updateStat = self.factory.expr(parent=whileBlock)
         updateStat.walk(node.firstChildOfType(tokens.FOR_UPDATE), memo)
 
@@ -465,7 +538,8 @@ class MethodContent(VarAcceptor, Base):
         inExpr = identExpr.right = self.factory.expr()
         inExpr.walk(node.firstChildOfType(tokens.EXPR), memo)
         forBlock = self.factory.methodContent(parent=self)
-        forBlock.walk(node.children[4], memo)
+        self.openLabelContinue(node, forBlock).walk(node.children[4], memo)
+        self.closeLabelContinue(node, forBlock)
 
     def acceptIf(self, node, memo):
         """ Accept and process an if statement. """
@@ -511,6 +585,35 @@ class MethodContent(VarAcceptor, Base):
                 else:
                     self.factory.expr(left='pass', parent=elseStat)
 
+
+    def acceptLabeledStatement(self, node, memo):
+        """ Accept and process a labeled statement.
+
+        Python has no labeled break or continue, so a jump that a bare
+        keyword cannot express becomes a raise, and the labeled statement
+        is wrapped in the handlers that catch it.
+        """
+        # LABELED_STATEMENT - IDENT - statement
+        label, stmtNode = node.children[0].text, node.children[1]
+        jumpTypes = (tokens.BREAK, tokens.CONTINUE)
+        names = {}
+        for jump in node.findChildren(lambda c:c.type in jumpTypes):
+            jumpTarget, name = self.labelJump(jump)
+            if jumpTarget is stmtNode and name:
+                names[jump.type] = name
+        breakName, continueName = names.get(tokens.BREAK), names.get(tokens.CONTINUE)
+        if continueName:
+            self.addLabelClass(continueName, 'continue', label)
+            stmtNode.labelContinueClass = continueName
+        target = self
+        if breakName:
+            self.addLabelClass(breakName, 'break', label)
+            target = self.factory.statement('try', fs=FS.lc, parent=self)
+        target.walk(stmtNode, memo)
+        if breakName:
+            exStat = self.factory.statement('except', fs=FS.lsrc, parent=self)
+            exStat.expr.right = breakName
+            self.factory.expr(left='pass', parent=exStat)
 
     def acceptSwitch(self, node, memo):
         """ Accept and process a switch block. """
@@ -617,10 +720,12 @@ class MethodContent(VarAcceptor, Base):
         parNode, blkNode = node.children
         whileStat = self.factory.statement('while', fs=FS.lsrc, parent=self)
         whileStat.expr.walk(parNode, memo)
+        whileBody = self.openLabelContinue(node, whileStat)
         if not blkNode.children:
-            self.factory.expr(left='pass', parent=whileStat)
+            self.factory.expr(left='pass', parent=whileBody)
         else:
-            whileStat.walk(blkNode, memo)
+            whileBody.walk(blkNode, memo)
+        self.closeLabelContinue(node, whileStat)
 
 
 class Method(ModifiersAcceptor, MethodContent):

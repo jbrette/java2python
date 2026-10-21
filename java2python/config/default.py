@@ -27,6 +27,7 @@ modulePrologueHandlers = [
     basic.maybeJavaDiv,
     basic.maybeAbstractHelpers,
     basic.maybeSyncHelpers,
+    basic.maybeLabelClasses,
 ]
 
 

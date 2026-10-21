@@ -8,12 +8,12 @@ import sys
 from argparse import ArgumentParser, ArgumentTypeError
 from collections import defaultdict
 from importlib.metadata import PackageNotFoundError, version as packageVersion
-from logging import getLevelNamesMapping, exception, warning, info, basicConfig
+from logging import getLevelNamesMapping, error, exception, warning, info, basicConfig
 from os import path, makedirs, walk
 from time import time
 from io import IOBase
 
-from java2python.compiler import Module, buildAST, transformAST
+from java2python.compiler import JavaSyntaxError, Module, buildAST, transformAST
 from java2python.config import Config
 from java2python.lib import escapes
 
@@ -74,12 +74,15 @@ def runOneOrMany(options):
                 options.inputfile = fullname
                 info('opening %s', fullname)
                 if outfile and outfile != '-' and not isinstance(outfile, IOBase):
-                    full = path.abspath(path.join(outfile, fullname))
-                    head, tail = path.split(full)
-                    tail = path.splitext(tail)[0] + '.py'
-                    if not path.exists(head):
+                    # path.join discards the output directory when the
+                    # walked name is absolute, so mirror the tree with a
+                    # path relative to the input directory instead.
+                    relname = path.relpath(fullname, infile)
+                    full = path.join(outfile, path.splitext(relname)[0] + '.py')
+                    head = path.dirname(full)
+                    if head and not path.exists(head):
                         makedirs(head)
-                    options.outputfile = path.join(head, tail)
+                    options.outputfile = full
                 runTransform(options)
         return 0
     else:
@@ -96,10 +99,11 @@ def runTransform(options):
         filein = options.inputfile
     if options.outputfile and not isinstance(options.outputfile, IOBase):
         fileout = options.outputfile
-    elif fileout != filedefault:
-        fileout = '%s.py' % (path.splitext(filein)[0])
 
-    configs = options.configs
+    # A copy:  one options object is reused for every file of a directory
+    # walk, and inserting into the original accumulates the configs of
+    # each file that came before.
+    configs = list(options.configs)
     if options.configdirs and not isinstance(filein, IOBase):
         for configdir in options.configdirs:
             dirname = configFromDir(filein, configdir)
@@ -115,13 +119,15 @@ def runTransform(options):
         else:
             source = sys.stdin.read()
     except OSError as exc:
-        code, msg = exc.args[0:2]
-        print('IOError: {}.'.format(msg))
-        return code
+        error('could not read %s: %s', filein, exc.strerror or exc)
+        return exc.errno or 1
 
     timed['comp']
     try:
         tree = buildAST(source)
+    except (JavaSyntaxError, ) as exc:
+        error('could not parse %s: %s', filein, exc)
+        return 1
     except (Exception, ) as exc:
         exception('exception while parsing')
         return 1
@@ -158,7 +164,6 @@ def runTransform(options):
         print(file=sys.stderr)
 
     if not options.skipsource:
-        module.name = path.splitext(filein)[0] if filein != '-' else '<stdin>'
         if fileout == filedefault:
             print(source)
         else:

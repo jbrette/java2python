@@ -9,13 +9,25 @@ from java2python.compiler.block import Module
 from java2python.lang import Lexer, Parser, StringStream, TokenStream, TreeAdaptor
 
 
+class JavaSyntaxError(Exception):
+    """ Raised when the Java source cannot be parsed. """
+
+
 def buildAST(source):
-    """ Returns an AST for the given source. """
+    """ Returns an AST for the given source.
+
+    The lexer and parser report their own errors to stderr and then
+    recover, which leaves a tree that later stages cannot walk, so the
+    error count is checked here instead of failing further downstream.
+    """
     lexer = Lexer(StringStream(source))
     parser = Parser(TokenStream(lexer))
     adapter = TreeAdaptor(lexer, parser)
     parser.setTreeAdaptor(adapter)
     scope = parser.javaSource()
+    errors = lexer.getNumberOfSyntaxErrors() + parser.getNumberOfSyntaxErrors()
+    if errors:
+        raise JavaSyntaxError(f'{errors} syntax error(s) in Java source')
     return scope.tree
 
 

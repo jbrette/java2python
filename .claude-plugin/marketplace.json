@@ -1,0 +1,24 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "java2python",
+  "description": "The java2python Claude Code plugin: translate Java source to Python with the j2py compiler.",
+  "owner": {
+    "name": "jbrette",
+    "url": "https://github.com/jbrette/java2python"
+  },
+  "plugins": [
+    {
+      "name": "j2p",
+      "description": "Translate Java source to Python with the java2python (j2py) compiler, then repair what a grammar-driven translator cannot get right on its own. The parser handles structure, control flow and operators; the model fixes what needs type knowledge, such as string concatenation, the Java standard library and integer remainder.",
+      "author": {
+        "name": "java2python contributors",
+        "url": "https://github.com/jbrette/java2python"
+      },
+      "category": "development",
+      "homepage": "https://github.com/jbrette/java2python",
+      "license": "MIT",
+      "keywords": ["java", "python", "translation", "transpiler", "migration", "j2py"],
+      "source": "./plugin"
+    }
+  ]
+}

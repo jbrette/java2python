@@ -53,4 +53,18 @@ Configuration (`config/__init__.py`): `Config` wraps an ordered list of config m
 
 Runtime helpers: when the visitor sees certain constructs it sets a flag on the module (`needsBsrFunc` for `>>>`, `needsJavaDivFunc` for `/` and `/=`, `needsSyncHelpers`, `needsAbstractHelpers`), and a module prologue handler in `mod/basic.py` inlines the source of the matching function from `mod/include/` into the output. Java `/` becomes `jdiv(a, b)`, which truncates toward zero for ints, because types aren't tracked. Interfaces become `ABC` subclasses with `@abstractmethod`.
 
-Output post-processing: `moduleOutputHandlers` includes `basic.outputSubs`, which applies the regex pairs in `<typeName>OutputSubs` (e.g. `moduleOutputSubs` in `config/default.py`, which maps `System.out.println` to `print`) to the generated text.
+## Claude Code plugin
+
+`plugin/` is a Claude Code plugin named `j2p` (manifest in
+`plugin/.claude-plugin/plugin.json`; the repository root is also a marketplace
+via `.claude-plugin/marketplace.json`).  It ships the `java2python` skill and
+the `/j2p:translate` command, both of which shell out to
+`plugin/scripts/j2py.sh`.  That script resolves the translator from
+`$J2PY_HOME`, else this checkout (preferring `uv run`, falling back to
+`python3 bin/j2py`), else a `j2py` on `PATH`.  `claude plugin validate .`
+checks both manifests.  The skill's value is the list of things j2py cannot
+get right without types -- keep it in sync with the real behavior.
+
+## Output post-processing
+
+`moduleOutputHandlers` includes `basic.outputSubs`, which applies the regex pairs in `<typeName>OutputSubs` (e.g. `moduleOutputSubs` in `config/default.py`, which maps `System.out.println` to `print`) to the generated text.
